@@ -21,6 +21,73 @@ const std::vector<std::string> FILES = {
     "ChatTorFrontEnd.exe"
 };
 
+const std::vector<std::string> DLL_FILES_NEEDED = {
+    "libgcc_s_seh-1.dll",
+    "libwinpthread-1.dll",
+    "libstdc++-6.dll"
+};
+
+bool checkAndDownloadDLLs(const std::filesystem::path& installDir)
+{
+    std::cout << "\n==== Checking Required DLLs ====\n";
+    
+    bool allSuccess = true;
+    std::vector<std::string> missingDLLs;
+
+    for (const auto& dllName : DLL_FILES_NEEDED)
+    {
+        std::filesystem::path dllPath = installDir / dllName;
+        
+        if (!std::filesystem::exists(dllPath))
+        {
+            missingDLLs.push_back(dllName);
+            std::cout << dllName << " ... MISSING\n";
+        }
+        else
+        {
+            std::cout << dllName << " ... Found\n";
+        }
+    }
+
+    // Download missing DLLs
+    if (!missingDLLs.empty())
+    {
+        std::cout << "\nDownloading missing DLLs...\n";
+        
+        for (const auto& dllName : missingDLLs)
+        {
+            std::string url = BASE_URL + dllName;
+            std::filesystem::path destPath = installDir / dllName;
+
+            std::cout << "Downloading " << dllName << " ... ";
+
+            HRESULT hr = URLDownloadToFileA(
+                nullptr,
+                url.c_str(),
+                destPath.string().c_str(),
+                0,
+                nullptr
+            );
+
+            if (SUCCEEDED(hr))
+            {
+                std::cout << "OK\n";
+            }
+            else
+            {
+                std::cout << "FAILED (HRESULT 0x" << std::hex << hr << std::dec << ")\n";
+                allSuccess = false;
+            }
+        }
+    }
+    else
+    {
+        std::cout << "All required DLLs are present.\n";
+    }
+
+    return allSuccess;
+}
+
 int main()
 {
     std::cout << "==== ChatTor Installer x64 ====\n\n";
@@ -75,6 +142,14 @@ int main()
     if (!allSuccess)
     {
         std::cout << "\nSome files failed to download.\n";
+        system("pause");
+        return 1;
+    }
+
+    // Check and download required DLLs
+    if (!checkAndDownloadDLLs(installDir))
+    {
+        std::cout << "\nSome DLLs failed to download.\n";
         system("pause");
         return 1;
     }
